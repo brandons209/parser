@@ -12,6 +12,8 @@ default-run = "parse_demo"
 [lib]
 name = "tf_demo_parser"
 path = "src/lib.rs"
+# "cdylib" is necessary to produce a shared library for Python to import from.
+crate-type = ["cdylib"]
 
 [[bin]]
 name = "parse_demo"
@@ -51,6 +53,7 @@ schemars = { version = "0.8.11", optional = true }
 tracing = { version = "0.1.37", optional = true }
 tracing-subscriber = { version = "0.3.16", features = ["env-filter"], optional = true }
 itertools = "0.10.5"
+pyo3 = { version = "0.17.1", features = ["extension-module"] }
 
 [features]
 schema = ["schemars", "bitbuffer/schemars"]

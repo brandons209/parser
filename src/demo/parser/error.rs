@@ -7,6 +7,8 @@ use bitbuffer::BitError;
 use err_derive::Error;
 use std::str::Utf8Error;
 use std::string::FromUtf8Error;
+use pyo3::prelude::*;
+use pyo3::exceptions::PyOSError;
 
 /// Errors that can occur during parsing
 #[derive(Debug, Error)]
@@ -126,6 +128,12 @@ impl From<BitError> for ParseError {
 impl From<FromUtf8Error> for ParseError {
     fn from(err: FromUtf8Error) -> ParseError {
         ParseError::MalformedUTF8(err.utf8_error())
+    }
+}
+
+impl std::convert::From<ParseError> for PyErr {
+    fn from(err: ParseError) -> PyErr {
+        PyOSError::new_err(err.to_string())
     }
 }
 

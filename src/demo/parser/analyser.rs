@@ -17,6 +17,7 @@ use serde::{ser::SerializeMap, Deserialize, Deserializer, Serialize, Serializer}
 use std::collections::{BTreeMap, HashMap};
 use std::convert::TryFrom;
 use std::ops::{Index, IndexMut};
+use std::fmt;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ChatMessage {
@@ -59,8 +60,23 @@ impl Team {
         Team::try_from(u8::try_from(number).unwrap_or_default()).unwrap_or_default()
     }
 
+    pub fn team(&self) -> String {
+        match *self {
+            Team::Red => "red".to_string(),
+            Team::Blue => "blue".to_string(),
+            Team::Other => "other".to_string(),
+            Team::Spectator => "spectator".to_string(),
+        }
+    }
+
     pub fn is_player(&self) -> bool {
         *self == Team::Red || *self == Team::Blue
+    }
+}
+
+impl fmt::Display for Team {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.team())
     }
 }
 
@@ -280,9 +296,9 @@ pub struct UserInfo {
     pub name: String,
     pub user_id: UserId,
     pub steam_id: String,
+    pub team: Team,
     #[serde(skip)]
     pub entity_id: EntityId,
-    pub team: Team,
 }
 
 impl From<crate::demo::data::UserInfo> for UserInfo {
