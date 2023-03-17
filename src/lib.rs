@@ -308,17 +308,17 @@ fn py_main(path: String) -> PyResult<String> {
         rounds_data = rounds_data + &s;
     }
 
-    Ok(format!("{:?}", header) + "\n" + 
+    Ok(format!("{:?}", header) + "\n[=============]\n" + 
         scoreboard_table_header + "\n" + 
-        &scoreboard_data  + "\n[=============]\n" +  
+        &scoreboard_data  + "[=============]\n" +  
         &sentry_table_header + "\n" + 
-        &sentry_data  + "\n[=============]\n" +  
+        &sentry_data  + "[=============]\n" +  
         &dispenser_table_header + "\n" + 
-        &dispenser_data  + "\n[=============]\n" +  
+        &dispenser_data  + "[=============]\n" +  
         &teleporter_table_header + "\n" + 
-        &teleporter_data  + "\n[=============]\n" +  
+        &teleporter_data  + "[=============]\n" +  
         kills_table_header + "\n" + 
-        &kill_data  + "\n[=============]\n" +  
+        &kill_data  + "[=============]\n" +  
         rounds_table_header + "\n" + 
         &rounds_data)
 }
