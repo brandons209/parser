@@ -9,10 +9,14 @@ pub use std::fs;
 pub use crate::demo::{
     message::MessageType,
     parser::{
-        DemoParser, GameEventError, MatchState, MessageTypeAnalyser, Parse, ParseError,
-        ParserState, Result,
+        DemoParser, Parse, ParserState, ParseError, Result,
+        GameEventError,
     },
+    parser::analyser::Analyser,
+    parser::analyser::UserId,
     parser::player_summary_analyzer::PlayerSummaryAnalyzer,
+    parser::gamestateanalyser::GameStateAnalyser,
+    parser::gamestateanalyser::BuildingClass,
     Demo, Stream,
 };
 
@@ -93,26 +97,28 @@ fn py_main(path: String) -> PyResult<String> {
     let file = fs::read(path)?;
     let demo = Demo::new(&file);
 
+    // gets scoreboard information
     let parser = DemoParser::new_all_with_analyser(demo.get_stream(), PlayerSummaryAnalyzer::new());
-    let (header, state) = parser.parse()?;
+    let (header, player_state) = parser.parse()?;
 
-    let parser = DemoParser::new_all(demo.get_stream()); // TODO: remove once new_all_with_analyser properly reports team, class, etc
-    let (_, all_state) = parser.parse()?;
+    // gets building events, kill events, team, and class information
+    let parser = DemoParser::new_all_with_analyser(demo.get_stream(), GameStateAnalyser::new());
+    let (_, mut game_state) = parser.parse()?;
 
-    let table_header = "player,id,points,kills,deaths,assists,destruction,captures,defenses,domination,revenge,ubers,headshots,teleports,healing,backstabs,bonus,support,damage,team,class";
+    // gets chat messages, deaths, rounds, and start_tick
+    let parser = DemoParser::new_all_with_analyser(demo.get_stream(), Analyser::new());
+    let (_, server_state) = parser.parse()?;
 
-    let mut data: String = "".to_owned();
-    for (user_id, user_data) in state.users {
-        let player_name = user_data.name;
-        let team = all_state.users[&user_id].team;
-        let mut tf_class = Class::Other;
-        // get the class with most spawns
-        for (c, _s) in all_state.users[&user_id].classes.sorted() {
-            tf_class = c;
-            break;
-        }
-        let steam_id = user_data.steam_id;
-        let summary = state.player_summaries.get(&user_id);
+    // process scoreboard information
+    let scoreboard_table_header = "player,id,points,kills,deaths,assists,destruction,captures,defenses,domination,revenge,ubers,headshots,teleports,healing,backstabs,bonus,support,damage,team,class";
+    let mut scoreboard_data: String = "".to_owned();
+    for (user_id, user_data) in &player_state.users {
+        let player_name = &user_data.name;
+        let player_data = game_state.get_or_create_player(user_data.entity_id);
+        let team = player_data.team;
+        let tf_class = player_data.class;
+        let steam_id = &user_data.steam_id;
+        let summary = player_state.player_summaries.get(&user_id);
         match summary {
             Some(s) => {
                 let s: String = format!(
@@ -139,7 +145,7 @@ fn py_main(path: String) -> PyResult<String> {
                     team,
                     tf_class,
                 );
-                data = data + &s;
+                scoreboard_data = scoreboard_data + &s;
             },
             None => {
                 // No summary for this player - they likely joined at the end of the match, or left before they did anything noteworthy
@@ -147,7 +153,174 @@ fn py_main(path: String) -> PyResult<String> {
         }
     }
 
-    Ok(format!("{:?}", header) + "\n" + table_header + "\n" + &data)
+    // process building information
+    
+    let common_building_table_header = "id,builder,x,y,z,level,max_health,health,sapped,team,angle,building".to_owned();
+    let sentry_table_header = common_building_table_header.clone() + ",player_controlled,target,shells,rockets,is_mini";
+    let dispenser_table_header = common_building_table_header.clone() + ",metal";
+    let teleporter_table_header = common_building_table_header.clone() + ",is_entrance,connected_to,recharge_time,recharge_duration,times_used,yaw_to_exit";
+
+    let mut sentry_data: String = "".to_owned();
+    let mut dispenser_data: String = "".to_owned();
+    let mut teleporter_data: String = "".to_owned();
+
+    for (entity_id, building_data) in game_state.buildings {
+        let mut common = "".to_owned();
+        let mut specific = "".to_owned();
+
+        let builder;
+        
+        match player_state.users.get(&building_data.builder()) {
+            Some(info) => {
+                builder = info.steam_id.clone();
+            },
+            None => {
+                builder = "unknown".to_string();
+            }
+        }
+
+        let s: String = format!(
+            "{},{},{},{},{},{},{},{},{},{},{},{}",
+            entity_id,
+            builder,
+            building_data.position().x,
+            building_data.position().y,
+            building_data.position().z,
+            building_data.level(),
+            building_data.max_health(),
+            building_data.health(),
+            building_data.sapped(),
+            building_data.team(),
+            building_data.angle(),
+            building_data.building(),
+        );
+
+        common = common + &s;
+        
+        if building_data.class() == BuildingClass::Sentry
+        {
+            let target;
+
+            match player_state.users.get(&building_data.auto_aim_target()) {
+                Some(info) => {
+                    target = info.steam_id.clone();
+                },
+                None => {
+                    target = "unknown".to_string();
+                }
+            }
+
+            let s: String = format!(
+                ",{},{},{},{},{}\n",
+                building_data.player_controlled(),
+                target,
+                building_data.shells(),
+                building_data.rockets(),
+                building_data.is_mini(),
+            );
+            specific = specific + &s;
+ 
+            common = common + &specific;
+            sentry_data = sentry_data + &common;
+        }
+        else if building_data.class() == BuildingClass::Dispenser
+        {
+            let s: String = format!(
+                ",{}\n",
+                building_data.metal(),
+            );
+            specific = specific + &s;
+   
+            common = common + &specific;
+            dispenser_data = dispenser_data + &common;
+        }
+        else if building_data.class() == BuildingClass::Teleporter
+        {
+            let s: String = format!(
+                ",{},{},{},{},{},{}\n",
+                building_data.is_entrance(),
+                building_data.other_end(),
+                building_data.recharge_time(),
+                building_data.recharge_duration(),
+                building_data.times_used(),
+                building_data.yaw_to_exit(),
+            );
+            specific = specific + &s;
+        
+            common = common + &specific;
+            teleporter_data = teleporter_data + &common;
+        }
+    }
+
+    let kills_table_header = "tick,attacker,assister,victim,weapon";
+    let mut kill_data: String = "".to_owned();
+    for kill in game_state.kills {
+        let killer;
+        let killed;
+        let assister;
+
+        match player_state.users.get(&UserId::from(kill.attacker_id)) {
+            Some(info) => {
+                killer = info.steam_id.clone();
+            },
+            None => {
+                killer = "unknown".to_string();
+            }
+        }
+        match player_state.users.get(&UserId::from(kill.assister_id)) {
+            Some(info) => {
+                assister = info.steam_id.clone();
+            },
+            None => {
+                assister = "unknown".to_string();
+            }
+        }
+        match player_state.users.get(&UserId::from(kill.victim_id)) {
+            Some(info) => {
+                killed = info.steam_id.clone();
+            },
+            None => {
+                killed = "unknown".to_string();
+            }
+        }
+
+        let s: String = format!(
+            "{},{},{},{},{}\n",
+            kill.tick,
+            killer,
+            assister,
+            killed,
+            kill.weapon,
+        );
+        kill_data = kill_data + &s;
+    }
+
+
+    let rounds_table_header = "end_tick,length,winner";
+    let mut rounds_data: String = "".to_owned();
+    for round in server_state.rounds {
+        let s: String = format!(
+            "{},{},{}\n",
+            round.end_tick,
+            round.length,
+            round.winner,
+        );
+        rounds_data = rounds_data + &s;
+    }
+
+    Ok(format!("{:?}", header) + "\n" + 
+        scoreboard_table_header + "\n" + 
+        &scoreboard_data  + "\n[=============]\n" +  
+        &sentry_table_header + "\n" + 
+        &sentry_data  + "\n[=============]\n" +  
+        &dispenser_table_header + "\n" + 
+        &dispenser_data  + "\n[=============]\n" +  
+        &teleporter_table_header + "\n" + 
+        &teleporter_data  + "\n[=============]\n" +  
+        kills_table_header + "\n" + 
+        &kill_data  + "\n[=============]\n" +  
+        rounds_table_header + "\n" + 
+        &rounds_data)
 }
 
 /// A Python module implemented in Rust. The name of this function must match

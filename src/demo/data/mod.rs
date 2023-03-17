@@ -246,6 +246,12 @@ impl DemoTick {
     }
 }
 
+impl Display for DemoTick {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 impl PartialEq<u32> for DemoTick {
     fn eq(&self, other: &u32) -> bool {
         *other == self.0

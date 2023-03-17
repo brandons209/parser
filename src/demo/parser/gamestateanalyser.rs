@@ -205,6 +205,14 @@ impl Building {
         }
     }
 
+    pub fn building(&self) -> bool {
+        match self {
+            Building::Sentry(Sentry { building, .. })
+            | Building::Dispenser(Dispenser { building, .. })
+            | Building::Teleporter(Teleporter { building, .. }) => *building,
+        }
+    }
+
     pub fn team(&self) -> Team {
         match self {
             Building::Sentry(Sentry { team, .. })
@@ -220,8 +228,108 @@ impl Building {
             Building::Teleporter(_) => BuildingClass::Teleporter,
         }
     }
+
+    // sentry vars
+    pub fn player_controlled(&self) -> bool {
+        match self {
+            Building::Sentry(Sentry { player_controlled, .. }) => *player_controlled,
+            Building::Dispenser(_) => false,
+            Building::Teleporter(_) => false,
+        }
+    }
+
+    pub fn auto_aim_target(&self) -> UserId {
+        match self {
+            Building::Sentry(Sentry { auto_aim_target, .. }) => *auto_aim_target,
+            Building::Dispenser(_) => UserId::from(u16::from(false)),
+            Building::Teleporter(_) => UserId::from(u16::from(false)),
+        }
+    }
+
+    pub fn shells(&self) -> u16 {
+        match self {
+            Building::Sentry(Sentry { shells, .. }) => *shells,
+            Building::Dispenser(_) => u16::from(false),
+            Building::Teleporter(_) => u16::from(false),
+        }
+    }
+
+    pub fn rockets(&self) -> u16 {
+        match self {
+            Building::Sentry(Sentry { rockets, .. }) => *rockets,
+            Building::Dispenser(_) => u16::from(false),
+            Building::Teleporter(_) => u16::from(false),
+        }
+    }
+
+    pub fn is_mini(&self) -> bool {
+        match self {
+            Building::Sentry(Sentry { is_mini, .. }) => *is_mini,
+            Building::Dispenser(_) => false,
+            Building::Teleporter(_) => false,
+        }
+    }
+
+    // dispenser vars
+    pub fn metal(&self) -> u16 {
+        match self {
+            Building::Dispenser(Dispenser { metal, .. }) => *metal,
+            Building::Sentry(_) => u16::from(false),
+            Building::Teleporter(_) => u16::from(false),
+        }
+    }
+
+    // teleporter vars
+    pub fn is_entrance(&self) -> bool {
+        match self {
+            Building::Teleporter(Teleporter { is_entrance, .. }) => *is_entrance,
+            Building::Sentry(_) => false,
+            Building::Dispenser(_) => false,
+        }
+    }
+
+    pub fn other_end(&self) -> EntityId {
+        match self {
+            Building::Teleporter(Teleporter { other_end, .. }) => *other_end,
+            Building::Sentry(_) => EntityId::from(u32::from(false)),
+            Building::Dispenser(_) => EntityId::from(u32::from(false)),
+        }
+    }
+
+    pub fn recharge_time(&self) -> f32 {
+        match self {
+            Building::Teleporter(Teleporter { recharge_time, .. }) => *recharge_time,
+            Building::Sentry(_) => 0.0,
+            Building::Dispenser(_) => 0.0,
+        }
+    }
+
+    pub fn recharge_duration(&self) -> f32 {
+        match self {
+            Building::Teleporter(Teleporter { recharge_duration, .. }) => *recharge_duration,
+            Building::Sentry(_) => 0.0,
+            Building::Dispenser(_) => 0.0,
+        }
+    }
+
+    pub fn times_used(&self) -> u16 {
+        match self {
+            Building::Teleporter(Teleporter { times_used, .. }) => *times_used,
+            Building::Sentry(_) => u16::from(false),
+            Building::Dispenser(_) => u16::from(false),
+        }
+    }
+
+    pub fn yaw_to_exit(&self) -> f32 {
+        match self {
+            Building::Teleporter(Teleporter { yaw_to_exit, .. }) => *yaw_to_exit,
+            Building::Sentry(_) => 0.0,
+            Building::Dispenser(_) => 0.0,
+        }
+    }
 }
 
+#[derive(PartialEq)]
 pub enum BuildingClass {
     Sentry,
     Dispenser,
