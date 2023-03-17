@@ -10,17 +10,19 @@ pub use crate::demo::{
     message::MessageType,
     parser::{
         DemoParser, Parse, ParserState, ParseError, Result,
-        GameEventError,
+        GameEventError
     },
     parser::analyser::Analyser,
     parser::analyser::UserId,
+    parser::analyser::Class,
+    parser::analyser::Team,
     parser::player_summary_analyzer::PlayerSummaryAnalyzer,
     parser::gamestateanalyser::GameStateAnalyser,
     parser::gamestateanalyser::BuildingClass,
     Demo, Stream,
 };
 
-pub use crate::demo::parser::analyser::Class;
+
 
 pub(crate) mod consthash;
 pub mod demo;
@@ -115,8 +117,23 @@ fn py_main(path: String) -> PyResult<String> {
     for (user_id, user_data) in &player_state.users {
         let player_name = &user_data.name;
         let player_data = game_state.get_or_create_player(user_data.entity_id);
-        let team = player_data.team;
-        let tf_class = player_data.class;
+        let mut team = player_data.team;
+        let mut tf_class = player_data.class;
+        if team == Team::Other
+        {
+            team = user_data.team;
+        }
+        if tf_class == Class::Other
+        {
+            for (c, _s) in user_data.classes.sorted()
+            {
+                if c != Class::Other
+                {
+                    tf_class = c;
+                    break;
+                }
+            }
+        }
         let steam_id = &user_data.steam_id;
         let summary = player_state.player_summaries.get(&user_id);
         match summary {
